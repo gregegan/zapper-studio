@@ -29,10 +29,16 @@ export class EthereumRocketPoolStakingContractPositionFetcher extends ContractPo
   }
 
   async getTokenDefinitions() {
+    const ROCKET_TOKEN_RPL = '0xd33526068d116ce69f19a9ee46f0bd304f21a51f';
     return [
       {
         metaType: MetaType.SUPPLIED,
-        address: '0xd33526068d116ce69f19a9ee46f0bd304f21a51f',
+        address: ROCKET_TOKEN_RPL,
+        network: this.network,
+      },
+      {
+        metaType: MetaType.CLAIMABLE,
+        address: ROCKET_TOKEN_RPL,
         network: this.network,
       },
     ];
@@ -43,6 +49,16 @@ export class EthereumRocketPoolStakingContractPositionFetcher extends ContractPo
   }
 
   async getTokenBalancesPerPosition({ address, contract }: GetTokenBalancesParams<RocketNodeStaking>) {
-    return [await contract.getNodeRPLStake(address)];
+    const multicall = this.appToolkit.getMulticall(this.network);
+    const rocketClaimNodeContract = this.contractFactory.rocketClaimNode({ address, network: this.network });
+    const rocketNodeDistributorContract = this.contractFactory.rocketNodeDistributorFactory({
+      address,
+      network: this.network,
+    });
+    const proxyAddress = await multicall.wrap(rocketNodeDistributorContract).getProxyAddress(address);
+    return [
+      await multicall.wrap(contract).getNodeRPLStake(address),
+      await multicall.wrap(rocketClaimNodeContract).getClaimRewardsAmount(address),
+    ];
   }
 }
